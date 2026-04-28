@@ -33,7 +33,7 @@ func (h *Handler) handleStart(msg *tgbotapi.Message) {
 		"Welcome to the EECP Booking System — your one-stop solution for booking EECP treatment sessions.\n\n"+
 		"🌟 *VIP Room* — 2 machines\n"+
 		"🏥 *Common Room* — 3 machines\n"+
-		"⏱ Each session is *1 hour*\n"+
+		"⏱ Each session is *1.5 hours*\n"+
 		"📅 Book up to *%d days* in advance\n\n"+
 		"How can we assist you today?",
 		firstName, h.maxDays)

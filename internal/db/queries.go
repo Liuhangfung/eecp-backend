@@ -23,47 +23,37 @@ func (s *Store) CountActiveMachines(ctx context.Context, room string) (int, erro
 	return count, err
 }
 
-func (s *Store) GetBookedCountsByHour(ctx context.Context, start, end time.Time, room string) (map[int]int, error) {
-	rows, err := s.pool.Query(ctx, `
-		SELECT EXTRACT(HOUR FROM b.start_time)::int AS hour, COUNT(*)
+func (s *Store) CountOverlappingBookings(ctx context.Context, slotStart, slotEnd time.Time, room string) (int, error) {
+	var count int
+	err := s.pool.QueryRow(ctx, `
+		SELECT COUNT(*)
 		FROM bookings b
 		JOIN machines m ON m.id = b.machine_id
 		WHERE b.status = 'confirmed'
-		  AND b.start_time >= $1
 		  AND b.start_time < $2
+		  AND b.end_time > $1
 		  AND m.room = $3
-		GROUP BY hour
-	`, start, end, room)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	counts := make(map[int]int)
-	for rows.Next() {
-		var hour, count int
-		if err := rows.Scan(&hour, &count); err != nil {
-			return nil, err
-		}
-		counts[hour] = count
-	}
-	return counts, rows.Err()
+	`, slotStart, slotEnd, room).Scan(&count)
+	return count, err
 }
 
 func (s *Store) GetFreeMachineForSlot(ctx context.Context, startTime time.Time, room string) (*model.Machine, error) {
+	endTime := startTime.Add(model.SessionDuration)
 	var m model.Machine
 	err := s.pool.QueryRow(ctx, `
 		SELECT m.id, m.name, m.is_active, m.room
 		FROM machines m
 		WHERE m.is_active = true
-		  AND m.room = $2
+		  AND m.room = $3
 		  AND m.id NOT IN (
 		      SELECT machine_id FROM bookings
-		      WHERE status = 'confirmed' AND start_time = $1
+		      WHERE status = 'confirmed'
+		        AND start_time < $2
+		        AND end_time > $1
 		  )
 		ORDER BY m.id
 		LIMIT 1
-	`, startTime, room).Scan(&m.ID, &m.Name, &m.IsActive, &m.Room)
+	`, startTime, endTime, room).Scan(&m.ID, &m.Name, &m.IsActive, &m.Room)
 	if err != nil {
 		return nil, fmt.Errorf("no free machine available for this slot")
 	}
@@ -71,18 +61,22 @@ func (s *Store) GetFreeMachineForSlot(ctx context.Context, startTime time.Time, 
 }
 
 func (s *Store) UserHasBookingForSlot(ctx context.Context, userID int64, startTime time.Time) (bool, error) {
+	endTime := startTime.Add(model.SessionDuration)
 	var exists bool
 	err := s.pool.QueryRow(ctx, `
 		SELECT EXISTS(
 			SELECT 1 FROM bookings
-			WHERE telegram_user_id = $1 AND start_time = $2 AND status = 'confirmed'
+			WHERE telegram_user_id = $1
+			  AND status = 'confirmed'
+			  AND start_time < $2
+			  AND end_time > $3
 		)
-	`, userID, startTime).Scan(&exists)
+	`, userID, endTime, startTime).Scan(&exists)
 	return exists, err
 }
 
 func (s *Store) CreateBooking(ctx context.Context, machineID int, userID int64, username string, startTime time.Time) (*model.Booking, error) {
-	endTime := startTime.Add(time.Hour)
+	endTime := startTime.Add(model.SessionDuration)
 	b := &model.Booking{}
 
 	err := s.pool.QueryRow(ctx, `
@@ -300,7 +294,7 @@ func (s *Store) GetStats(ctx context.Context, days int) (*model.Stats, error) {
 		LIMIT 1
 	`, since).Scan(&busiestHour)
 	if err == nil {
-		stats.BusiestHour = fmt.Sprintf("%02d:00 - %02d:00", busiestHour, busiestHour+1)
+		stats.BusiestHour = fmt.Sprintf("%02d:00", busiestHour)
 	}
 
 	if days > 0 {

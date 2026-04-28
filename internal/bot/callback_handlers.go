@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/eecp/booking-bot/internal/model"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
@@ -135,7 +136,7 @@ func (h *Handler) onQuickRoomSelected(chatID int64, msgID int, userID int64, use
 		return
 	}
 
-	endTime := slotStart.Add(time.Hour)
+	endTime := slotStart.Add(model.SessionDuration)
 	remaining := int(endTime.Sub(now).Minutes())
 
 	if remaining < 10 {
@@ -143,7 +144,7 @@ func (h *Handler) onQuickRoomSelected(chatID int64, msgID int, userID int64, use
 
 		hasNext, _ := h.service.UserHasBookingForSlot(ctx, userID, nextSlot)
 		if hasNext {
-			h.editMessage(chatID, msgID, "✅ You already have a booking for the next hour. Use 📋 My Bookings to view it.", nil)
+			h.editMessage(chatID, msgID, "✅ You already have a booking for the next slot. Use 📋 My Bookings to view it.", nil)
 			return
 		}
 
@@ -154,8 +155,8 @@ func (h *Handler) onQuickRoomSelected(chatID int64, msgID int, userID int64, use
 		}
 		machine = nextMachine
 		slotStart = nextSlot
-		endTime = nextSlot.Add(time.Hour)
-		remaining = 60
+		endTime = nextSlot.Add(model.SessionDuration)
+		remaining = 90
 	}
 
 	text := fmt.Sprintf("⚡ Quick Book — %s\n\n  Machine: %s\n  Date:    %s\n  Time:    %s - %s\n  ⏱ %d min remaining\n\nConfirm?",
@@ -214,7 +215,7 @@ func (h *Handler) onBookNow(chatID int64, msgID int, userID int64, username stri
 	}
 
 	now := nowHKT()
-	endTime := startTime.Add(time.Hour)
+	endTime := startTime.Add(model.SessionDuration)
 	remaining := endTime.Sub(now)
 
 	ctx := context.Background()
@@ -264,7 +265,7 @@ func (h *Handler) onTimeSelected(chatID int64, msgID int, userID int64, username
 		machine.Name,
 		startTime.Format("Jan 2, 2006"),
 		startTime.Format("15:04"),
-		startTime.Add(time.Hour).Format("15:04"),
+		startTime.Add(model.SessionDuration).Format("15:04"),
 	)
 
 	keyboard := buildConfirmKeyboard(machine.ID, startTime.Format("2006-01-02T15:04"))

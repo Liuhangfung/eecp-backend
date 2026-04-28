@@ -12,6 +12,8 @@ type Machine struct {
 type BookingStatus string
 
 const (
+	SessionDuration = 90 * time.Minute
+
 	StatusConfirmed BookingStatus = "confirmed"
 	StatusCancelled BookingStatus = "cancelled"
 )

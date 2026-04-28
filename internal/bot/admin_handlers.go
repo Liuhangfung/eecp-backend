@@ -42,8 +42,9 @@ func (h *Handler) handlePostBooking(msg *tgbotapi.Message) {
 	bookURL := fmt.Sprintf("https://t.me/%s?start=book", botUsername)
 
 	text := "🏥 *EECP Booking System*\n\n" +
-		"We have 5 EECP machines available 24/7\\.\n" +
-		"Each session is 1 hour\\.\n\n" +
+		"🌟 VIP Room — 2 machines\n" +
+		"🏥 Common Room — 3 machines\n" +
+		"Each session is 1\\.5 hours\\.\n\n" +
 		"Tap the button below to book your session\\!"
 
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(

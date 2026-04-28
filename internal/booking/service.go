@@ -45,19 +45,18 @@ func (s *Service) GetAvailableSlots(ctx context.Context, date time.Time, room st
 		start = time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), 0, 0, 0, hkt)
 	}
 
-	bookedCounts, err := s.store.GetBookedCountsByHour(ctx, start, end, room)
-	if err != nil {
-		return nil, fmt.Errorf("get booked counts: %w", err)
-	}
-
 	var slots []model.SlotAvailability
-	for t := start; t.Before(end); t = t.Add(time.Hour) {
-		booked := bookedCounts[t.Hour()]
+	for t := start; t.Add(model.SessionDuration).Before(end) || t.Add(model.SessionDuration).Equal(end); t = t.Add(time.Hour) {
+		slotEnd := t.Add(model.SessionDuration)
+		booked, err := s.store.CountOverlappingBookings(ctx, t, slotEnd, room)
+		if err != nil {
+			return nil, fmt.Errorf("count overlapping bookings: %w", err)
+		}
 		free := activeMachines - booked
 		if free > 0 {
 			slots = append(slots, model.SlotAvailability{
 				StartTime:  t,
-				EndTime:    t.Add(time.Hour),
+				EndTime:    slotEnd,
 				FreeCount:  free,
 				TotalCount: activeMachines,
 			})
