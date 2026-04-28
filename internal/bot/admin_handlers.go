@@ -118,8 +118,8 @@ func (h *Handler) handleAllBookings(msg *tgbotapi.Message) {
 			short = short[:8]
 		}
 		line := fmt.Sprintf("  %s - %s  @%s (#%s)",
-			b.StartTime.Format("15:04"),
-			b.EndTime.Format("15:04"),
+			b.StartTime.In(hkt).Format("15:04"),
+			b.EndTime.In(hkt).Format("15:04"),
 			b.TelegramUsername,
 			short,
 		)
@@ -173,9 +173,9 @@ func (h *Handler) handleCancelBookingAdmin(msg *tgbotapi.Message) {
 	h.sendText(msg.Chat.ID, fmt.Sprintf(
 		"Booking #%s cancelled.\n\nUser: @%s\nMachine: %s\nTime: %s %s-%s",
 		short, b.TelegramUsername, b.MachineName,
-		b.StartTime.Format("Jan 2, 2006"),
-		b.StartTime.Format("15:04"),
-		b.EndTime.Format("15:04"),
+		b.StartTime.In(hkt).Format("Jan 2, 2006"),
+		b.StartTime.In(hkt).Format("15:04"),
+		b.EndTime.In(hkt).Format("15:04"),
 	))
 
 	h.notifier.NotifyCancellation(b, true)

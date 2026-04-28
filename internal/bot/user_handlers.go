@@ -138,9 +138,9 @@ func (h *Handler) handleMyBookings(msg *tgbotapi.Message) {
 			i+1,
 			short,
 			b.MachineName,
-			b.StartTime.Format("Jan 2, 2006"),
-			b.StartTime.Format("15:04"),
-			b.EndTime.Format("15:04"),
+			b.StartTime.In(hkt).Format("Jan 2, 2006"),
+			b.StartTime.In(hkt).Format("15:04"),
+			b.EndTime.In(hkt).Format("15:04"),
 		)
 	}
 

@@ -153,9 +153,9 @@ func buildCancelKeyboard(bookings []model.Booking) tgbotapi.InlineKeyboardMarkup
 		}
 		label := fmt.Sprintf("#%s — %s %s-%s",
 			short,
-			b.StartTime.Format("Jan 2"),
-			b.StartTime.Format("15:04"),
-			b.EndTime.Format("15:04"),
+			b.StartTime.In(hkt).Format("Jan 2"),
+			b.StartTime.In(hkt).Format("15:04"),
+			b.EndTime.In(hkt).Format("15:04"),
 		)
 		callbackData := fmt.Sprintf("cancelsel:%s", b.ID)
 		rows = append(rows, tgbotapi.NewInlineKeyboardRow(

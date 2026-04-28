@@ -317,9 +317,9 @@ func (h *Handler) onConfirm(chatID int64, msgID int, userID int64, username stri
 	text := fmt.Sprintf("Booking confirmed!\n\n  Booking ID: #%s\n  Machine:    %s\n  Date:       %s\n  Time:       %s - %s\n\nTo view your bookings: /mybookings\nTo cancel: /cancel",
 		short,
 		b.MachineName,
-		b.StartTime.Format("Jan 2, 2006"),
-		b.StartTime.Format("15:04"),
-		b.EndTime.Format("15:04"),
+		b.StartTime.In(hkt).Format("Jan 2, 2006"),
+		b.StartTime.In(hkt).Format("15:04"),
+		b.EndTime.In(hkt).Format("15:04"),
 	)
 
 	h.editMessage(chatID, msgID, text, nil)
@@ -364,9 +364,9 @@ func (h *Handler) onCancelSelect(chatID int64, msgID int, userID int64, data str
 	text := fmt.Sprintf("Are you sure you want to cancel?\n\n  #%s — %s\n  %s  %s - %s",
 		short,
 		found.machineName,
-		found.start.Format("Jan 2, 2006"),
-		found.start.Format("15:04"),
-		found.end.Format("15:04"),
+		found.start.In(hkt).Format("Jan 2, 2006"),
+		found.start.In(hkt).Format("15:04"),
+		found.end.In(hkt).Format("15:04"),
 	)
 
 	keyboard := buildCancelConfirmKeyboard(bookingID)

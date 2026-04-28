@@ -3,10 +3,19 @@ package notifier
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/eecp/booking-bot/internal/model"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
+
+var hkt = func() *time.Location {
+	loc, err := time.LoadLocation("Asia/Hong_Kong")
+	if err != nil {
+		loc = time.FixedZone("HKT", 8*60*60)
+	}
+	return loc
+}()
 
 type GroupNotifier struct {
 	bot     *tgbotapi.BotAPI
@@ -31,9 +40,9 @@ func (n *GroupNotifier) NotifyNewBooking(b *model.Booking) {
 			"🕐 Time: %s \\- %s",
 		escapeMarkdown(b.TelegramUsername),
 		escapeMarkdown(b.MachineName),
-		escapeMarkdown(b.StartTime.Format("Jan 2, 2006")),
-		escapeMarkdown(b.StartTime.Format("15:04")),
-		escapeMarkdown(b.EndTime.Format("15:04")),
+		escapeMarkdown(b.StartTime.In(hkt).Format("Jan 2, 2006")),
+		escapeMarkdown(b.StartTime.In(hkt).Format("15:04")),
+		escapeMarkdown(b.EndTime.In(hkt).Format("15:04")),
 	)
 
 	n.send(text)
@@ -59,9 +68,9 @@ func (n *GroupNotifier) NotifyCancellation(b *model.Booking, byAdmin bool) {
 			"_This slot is now available again\\._",
 		escapeMarkdown(b.TelegramUsername),
 		escapeMarkdown(b.MachineName),
-		escapeMarkdown(b.StartTime.Format("Jan 2, 2006")),
-		escapeMarkdown(b.StartTime.Format("15:04")),
-		escapeMarkdown(b.EndTime.Format("15:04")),
+		escapeMarkdown(b.StartTime.In(hkt).Format("Jan 2, 2006")),
+		escapeMarkdown(b.StartTime.In(hkt).Format("15:04")),
+		escapeMarkdown(b.EndTime.In(hkt).Format("15:04")),
 		cancelledBy,
 	)
 
