@@ -34,7 +34,7 @@ func (s *Service) GetAvailableSlots(ctx context.Context, date time.Time) ([]mode
 
 	now := time.Now()
 	if start.Before(now) {
-		start = time.Date(now.Year(), now.Month(), now.Day(), now.Hour()+1, 0, 0, 0, now.Location())
+		start = time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), 0, 0, 0, now.Location())
 	}
 
 	bookedCounts, err := s.store.GetBookedCountsByHour(ctx, start, end)
@@ -78,7 +78,8 @@ func (s *Service) CreateBooking(ctx context.Context, machineID int, userID int64
 		return nil, fmt.Errorf("cannot book more than %d days in advance", s.maxAdvanceDays)
 	}
 
-	if startTime.Before(now) {
+	currentSlotStart := time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), 0, 0, 0, now.Location())
+	if startTime.Before(currentSlotStart) {
 		return nil, fmt.Errorf("cannot book a slot in the past")
 	}
 

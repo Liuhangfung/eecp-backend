@@ -34,19 +34,38 @@ const defaultSlotLimit = 5
 
 func buildTimeKeyboard(slots []model.SlotAvailability, showAll bool) tgbotapi.InlineKeyboardMarkup {
 	now := time.Now()
+
+	var currentSlot *model.SlotAvailability
 	var upcoming []model.SlotAvailability
 	for _, slot := range slots {
-		if slot.StartTime.After(now) {
+		if !slot.StartTime.After(now) && slot.EndTime.After(now) {
+			s := slot
+			currentSlot = &s
+		} else if slot.StartTime.After(now) {
 			upcoming = append(upcoming, slot)
 		}
 	}
 
-	if len(upcoming) == 0 {
+	if currentSlot == nil && len(upcoming) == 0 {
 		return tgbotapi.NewInlineKeyboardMarkup(
 			tgbotapi.NewInlineKeyboardRow(
 				tgbotapi.NewInlineKeyboardButtonData("No available slots", "noop"),
 			),
 		)
+	}
+
+	var rows [][]tgbotapi.InlineKeyboardButton
+
+	if currentSlot != nil {
+		label := fmt.Sprintf("⚡ Book Now (%s - %s, %d free)",
+			currentSlot.StartTime.Format("15:04"),
+			currentSlot.EndTime.Format("15:04"),
+			currentSlot.FreeCount,
+		)
+		callbackData := fmt.Sprintf("booknow:%s", currentSlot.StartTime.Format("2006-01-02T15:04"))
+		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(label, callbackData),
+		))
 	}
 
 	display := upcoming
@@ -56,7 +75,6 @@ func buildTimeKeyboard(slots []model.SlotAvailability, showAll bool) tgbotapi.In
 		hasMore = true
 	}
 
-	var rows [][]tgbotapi.InlineKeyboardButton
 	for _, slot := range display {
 		label := fmt.Sprintf("%s - %s  (%d free)",
 			slot.StartTime.Format("15:04"),

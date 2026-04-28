@@ -47,6 +47,8 @@ func (h *Handler) handleCallback(cq *tgbotapi.CallbackQuery) {
 		h.onCancelConfirm(chatID, msgID, cq.From.ID, data)
 	case data == "cancel_booking_flow":
 		h.editMessage(chatID, msgID, "Booking flow cancelled.", nil)
+	case strings.HasPrefix(data, "booknow:"):
+		h.onBookNow(chatID, msgID, cq.From.ID, cq.From.UserName, data)
 	case strings.HasPrefix(data, "showmore:"):
 		h.onShowMoreSlots(chatID, msgID, data)
 	case strings.HasPrefix(data, "toggle:"):
@@ -99,6 +101,37 @@ func (h *Handler) onShowMoreSlots(chatID int64, msgID int, data string) {
 
 	keyboard := buildTimeKeyboard(slots, true)
 	h.editMessage(chatID, msgID, fmt.Sprintf("All available slots for %s:", date.Format("Jan 2, 2006")), &keyboard)
+}
+
+func (h *Handler) onBookNow(chatID int64, msgID int, userID int64, username string, data string) {
+	timeStr := strings.TrimPrefix(data, "booknow:")
+	startTime, err := time.Parse("2006-01-02T15:04", timeStr)
+	if err != nil {
+		h.editMessage(chatID, msgID, "Invalid time.", nil)
+		return
+	}
+
+	now := time.Now()
+	endTime := startTime.Add(time.Hour)
+	remaining := endTime.Sub(now)
+
+	ctx := context.Background()
+	machine, err := h.service.GetFreeMachineForSlot(ctx, startTime)
+	if err != nil {
+		h.editMessage(chatID, msgID, "Sorry, no machines are available right now.", nil)
+		return
+	}
+
+	text := fmt.Sprintf("⚡ Book Now — confirm your booking:\n\n  Machine: %s\n  Date:    %s\n  Time:    %s - %s\n  ⏱ %d min remaining in this slot",
+		machine.Name,
+		startTime.Format("Jan 2, 2006"),
+		startTime.Format("15:04"),
+		endTime.Format("15:04"),
+		int(remaining.Minutes()),
+	)
+
+	keyboard := buildConfirmKeyboard(machine.ID, startTime.Format("2006-01-02T15:04"))
+	h.editMessage(chatID, msgID, text, &keyboard)
 }
 
 func (h *Handler) onTimeSelected(chatID int64, msgID int, userID int64, username string, data string) {
