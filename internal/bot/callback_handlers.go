@@ -47,6 +47,8 @@ func (h *Handler) handleCallback(cq *tgbotapi.CallbackQuery) {
 		h.onCancelConfirm(chatID, msgID, cq.From.ID, data)
 	case data == "cancel_booking_flow":
 		h.editMessage(chatID, msgID, "Booking flow cancelled.", nil)
+	case strings.HasPrefix(data, "showmore:"):
+		h.onShowMoreSlots(chatID, msgID, data)
 	case strings.HasPrefix(data, "toggle:"):
 		h.onToggleMachine(chatID, msgID, cq.From.ID, data)
 	case data == "noop":
@@ -75,8 +77,28 @@ func (h *Handler) onDateSelected(chatID int64, msgID int, data string) {
 		return
 	}
 
-	keyboard := buildTimeKeyboard(slots)
+	keyboard := buildTimeKeyboard(slots, false)
 	h.editMessage(chatID, msgID, fmt.Sprintf("Available slots for %s:", date.Format("Jan 2, 2006")), &keyboard)
+}
+
+func (h *Handler) onShowMoreSlots(chatID int64, msgID int, data string) {
+	dateStr := strings.TrimPrefix(data, "showmore:")
+	date, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		h.editMessage(chatID, msgID, "Invalid date.", nil)
+		return
+	}
+
+	ctx := context.Background()
+	slots, err := h.service.GetAvailableSlots(ctx, date)
+	if err != nil {
+		h.editMessage(chatID, msgID, "Error loading available slots.", nil)
+		log.Printf("Error getting slots: %v", err)
+		return
+	}
+
+	keyboard := buildTimeKeyboard(slots, true)
+	h.editMessage(chatID, msgID, fmt.Sprintf("All available slots for %s:", date.Format("Jan 2, 2006")), &keyboard)
 }
 
 func (h *Handler) onTimeSelected(chatID int64, msgID int, userID int64, username string, data string) {
