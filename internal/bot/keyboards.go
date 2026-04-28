@@ -8,8 +8,20 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
+var hkt = func() *time.Location {
+	loc, err := time.LoadLocation("Asia/Hong_Kong")
+	if err != nil {
+		loc = time.FixedZone("HKT", 8*60*60)
+	}
+	return loc
+}()
+
+func nowHKT() time.Time {
+	return time.Now().In(hkt)
+}
+
 func buildDateKeyboard(maxDays int) tgbotapi.InlineKeyboardMarkup {
-	now := time.Now()
+	now := nowHKT()
 	var rows [][]tgbotapi.InlineKeyboardButton
 
 	for i := 0; i < maxDays; i++ {
@@ -33,7 +45,7 @@ func buildDateKeyboard(maxDays int) tgbotapi.InlineKeyboardMarkup {
 const defaultSlotLimit = 5
 
 func buildTimeKeyboard(slots []model.SlotAvailability, showAll bool) tgbotapi.InlineKeyboardMarkup {
-	now := time.Now()
+	now := nowHKT()
 
 	var currentSlot *model.SlotAvailability
 	var upcoming []model.SlotAvailability

@@ -9,6 +9,14 @@ import (
 	"github.com/eecp/booking-bot/internal/model"
 )
 
+var hkt = func() *time.Location {
+	loc, err := time.LoadLocation("Asia/Hong_Kong")
+	if err != nil {
+		loc = time.FixedZone("HKT", 8*60*60)
+	}
+	return loc
+}()
+
 type Service struct {
 	store             *db.Store
 	maxAdvanceDays    int
@@ -29,12 +37,12 @@ func (s *Service) GetAvailableSlots(ctx context.Context, date time.Time) ([]mode
 		return nil, fmt.Errorf("count active machines: %w", err)
 	}
 
-	start := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
+	start := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, hkt)
 	end := start.Add(24 * time.Hour)
 
-	now := time.Now()
+	now := time.Now().In(hkt)
 	if start.Before(now) {
-		start = time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), 0, 0, 0, now.Location())
+		start = time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), 0, 0, 0, hkt)
 	}
 
 	bookedCounts, err := s.store.GetBookedCountsByHour(ctx, start, end)
@@ -72,13 +80,13 @@ func (s *Service) CreateBooking(ctx context.Context, machineID int, userID int64
 		return nil, fmt.Errorf("you already have %d active bookings (max: %d)", active, s.maxActiveBookings)
 	}
 
-	now := time.Now()
-	maxDate := time.Date(now.Year(), now.Month(), now.Day()+s.maxAdvanceDays, 23, 59, 59, 0, now.Location())
+	now := time.Now().In(hkt)
+	maxDate := time.Date(now.Year(), now.Month(), now.Day()+s.maxAdvanceDays, 23, 59, 59, 0, hkt)
 	if startTime.After(maxDate) {
 		return nil, fmt.Errorf("cannot book more than %d days in advance", s.maxAdvanceDays)
 	}
 
-	currentSlotStart := time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), 0, 0, 0, now.Location())
+	currentSlotStart := time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), 0, 0, 0, hkt)
 	if startTime.Before(currentSlotStart) {
 		return nil, fmt.Errorf("cannot book a slot in the past")
 	}
@@ -104,7 +112,7 @@ func (s *Service) CancelBookingByAdmin(ctx context.Context, bookingID string) (*
 }
 
 func (s *Service) GetAllBookingsForDate(ctx context.Context, date time.Time) ([]model.Booking, error) {
-	start := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
+	start := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, hkt)
 	end := start.Add(24 * time.Hour)
 	return s.store.GetAllBookingsForRange(ctx, start, end)
 }

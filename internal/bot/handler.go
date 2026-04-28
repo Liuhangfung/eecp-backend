@@ -76,6 +76,8 @@ func (h *Handler) handleCommand(msg *tgbotapi.Message) {
 
 func (h *Handler) handleTextMessage(msg *tgbotapi.Message) {
 	switch msg.Text {
+	case "⚡ Quick Book":
+		h.handleQuickBook(msg)
 	case "📅 Book a Session":
 		h.handleBook(msg)
 	case "📋 My Bookings":

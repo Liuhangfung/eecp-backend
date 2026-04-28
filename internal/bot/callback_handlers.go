@@ -33,6 +33,8 @@ func (h *Handler) handleCallback(cq *tgbotapi.CallbackQuery) {
 		h.handleMyBookings(fakeMsg)
 	case data == "menu:cancel":
 		h.handleCancel(fakeMsg)
+	case data == "menu:quickbook":
+		h.handleQuickBook(fakeMsg)
 	case data == "menu:disclaimer":
 		h.handleDisclaimer(fakeMsg)
 	case strings.HasPrefix(data, "date:"):
@@ -111,7 +113,7 @@ func (h *Handler) onBookNow(chatID int64, msgID int, userID int64, username stri
 		return
 	}
 
-	now := time.Now()
+	now := nowHKT()
 	endTime := startTime.Add(time.Hour)
 	remaining := endTime.Sub(now)
 
