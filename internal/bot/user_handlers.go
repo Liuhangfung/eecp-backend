@@ -93,6 +93,12 @@ func (h *Handler) handleQuickBook(msg *tgbotapi.Message) {
 	now := time.Now().In(hkt)
 	slotStart := time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), 0, 0, 0, hkt)
 
+	hasBooking, err := h.service.UserHasBookingForSlot(ctx, msg.From.ID, slotStart)
+	if err == nil && hasBooking {
+		h.sendText(msg.Chat.ID, "✅ You already have a booking for this hour. Use 📋 My Bookings to view it.")
+		return
+	}
+
 	machine, err := h.service.GetFreeMachineForSlot(ctx, slotStart)
 	if err != nil {
 		h.sendText(msg.Chat.ID, "😔 Sorry, no machines are available right now. Try booking a later slot with 📅 Book a Session.")
@@ -101,6 +107,19 @@ func (h *Handler) handleQuickBook(msg *tgbotapi.Message) {
 
 	endTime := slotStart.Add(time.Hour)
 	remaining := int(endTime.Sub(now).Minutes())
+
+	if remaining < 10 {
+		nextSlot := slotStart.Add(time.Hour)
+		nextMachine, nextErr := h.service.GetFreeMachineForSlot(ctx, nextSlot)
+		if nextErr != nil {
+			h.sendText(msg.Chat.ID, fmt.Sprintf("⏱ Only %d min left in this hour and the next slot is full. Try 📅 Book a Session.", remaining))
+			return
+		}
+		machine = nextMachine
+		slotStart = nextSlot
+		endTime = nextSlot.Add(time.Hour)
+		remaining = 60
+	}
 
 	text := fmt.Sprintf("⚡ *Quick Book — Right Now*\n\n"+
 		"  Machine: %s\n"+

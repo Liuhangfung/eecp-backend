@@ -67,6 +67,17 @@ func (s *Store) GetFreeMachineForSlot(ctx context.Context, startTime time.Time) 
 	return &m, nil
 }
 
+func (s *Store) UserHasBookingForSlot(ctx context.Context, userID int64, startTime time.Time) (bool, error) {
+	var exists bool
+	err := s.pool.QueryRow(ctx, `
+		SELECT EXISTS(
+			SELECT 1 FROM bookings
+			WHERE telegram_user_id = $1 AND start_time = $2 AND status = 'confirmed'
+		)
+	`, userID, startTime).Scan(&exists)
+	return exists, err
+}
+
 func (s *Store) CreateBooking(ctx context.Context, machineID int, userID int64, username string, startTime time.Time) (*model.Booking, error) {
 	endTime := startTime.Add(time.Hour)
 	b := &model.Booking{}

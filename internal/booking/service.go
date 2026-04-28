@@ -71,6 +71,10 @@ func (s *Service) GetFreeMachineForSlot(ctx context.Context, startTime time.Time
 	return s.store.GetFreeMachineForSlot(ctx, startTime)
 }
 
+func (s *Service) UserHasBookingForSlot(ctx context.Context, userID int64, startTime time.Time) (bool, error) {
+	return s.store.UserHasBookingForSlot(ctx, userID, startTime)
+}
+
 func (s *Service) CreateBooking(ctx context.Context, machineID int, userID int64, username string, startTime time.Time) (*model.Booking, error) {
 	active, err := s.store.CountActiveBookingsForUser(ctx, userID)
 	if err != nil {
