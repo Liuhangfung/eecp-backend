@@ -92,7 +92,7 @@ func (h *Handler) handleAllBookings(msg *tgbotapi.Message) {
 		date = time.Now()
 	} else {
 		var err error
-		date, err = time.Parse("2006-01-02", dateStr)
+		date, err = time.ParseInLocation("2006-01-02", dateStr, hkt)
 		if err != nil {
 			h.sendText(msg.Chat.ID, "Invalid date format. Use: /allbookings 2026-04-03")
 			return

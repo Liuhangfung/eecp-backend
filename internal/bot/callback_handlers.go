@@ -74,7 +74,7 @@ func roomLabel(room string) string {
 
 func (h *Handler) onDateSelected(chatID int64, msgID int, data string) {
 	dateStr := strings.TrimPrefix(data, "date:")
-	_, err := time.Parse("2006-01-02", dateStr)
+	_, err := time.ParseInLocation("2006-01-02", dateStr, hkt)
 	if err != nil {
 		h.editMessage(chatID, msgID, "Invalid date selected.", nil)
 		return
@@ -93,7 +93,7 @@ func (h *Handler) onRoomSelected(chatID int64, msgID int, data string) {
 	}
 	room, dateStr := parts[0], parts[1]
 
-	date, err := time.Parse("2006-01-02", dateStr)
+	date, err := time.ParseInLocation("2006-01-02", dateStr, hkt)
 	if err != nil {
 		h.editMessage(chatID, msgID, "Invalid date.", nil)
 		return
@@ -181,7 +181,7 @@ func (h *Handler) onShowMoreSlots(chatID int64, msgID int, data string) {
 	}
 	room, dateStr := parts[0], parts[1]
 
-	date, err := time.Parse("2006-01-02", dateStr)
+	date, err := time.ParseInLocation("2006-01-02", dateStr, hkt)
 	if err != nil {
 		h.editMessage(chatID, msgID, "Invalid date.", nil)
 		return
@@ -208,7 +208,7 @@ func (h *Handler) onBookNow(chatID int64, msgID int, userID int64, username stri
 	}
 	room, timeStr := parts[0], parts[1]
 
-	startTime, err := time.Parse("2006-01-02T15:04", timeStr)
+	startTime, err := time.ParseInLocation("2006-01-02T15:04", timeStr, hkt)
 	if err != nil {
 		h.editMessage(chatID, msgID, "Invalid time.", nil)
 		return
@@ -247,7 +247,7 @@ func (h *Handler) onTimeSelected(chatID int64, msgID int, userID int64, username
 	}
 	room, timeStr := parts[0], parts[1]
 
-	startTime, err := time.Parse("2006-01-02T15:04", timeStr)
+	startTime, err := time.ParseInLocation("2006-01-02T15:04", timeStr, hkt)
 	if err != nil {
 		h.editMessage(chatID, msgID, "Invalid time selected.", nil)
 		return
@@ -285,7 +285,7 @@ func (h *Handler) onConfirm(chatID int64, msgID int, userID int64, username stri
 		return
 	}
 
-	startTime, err := time.Parse("2006-01-02T15:04", parts[1])
+	startTime, err := time.ParseInLocation("2006-01-02T15:04", parts[1], hkt)
 	if err != nil {
 		h.editMessage(chatID, msgID, "Invalid time.", nil)
 		return
