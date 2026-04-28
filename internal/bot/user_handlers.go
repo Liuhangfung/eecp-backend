@@ -6,7 +6,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -32,7 +31,8 @@ func (h *Handler) handleStart(msg *tgbotapi.Message) {
 
 	greeting := fmt.Sprintf("👋 Hello %s!\n\n"+
 		"Welcome to the EECP Booking System — your one-stop solution for booking EECP treatment sessions.\n\n"+
-		"🏥 We have *5 EECP machines* available *24/7*\n"+
+		"🌟 *VIP Room* — 2 machines\n"+
+		"🏥 *Common Room* — 3 machines\n"+
 		"⏱ Each session is *1 hour*\n"+
 		"📅 Book up to *%d days* in advance\n\n"+
 		"How can we assist you today?",
@@ -89,57 +89,12 @@ func (h *Handler) sendPersistentMenu(chatID int64) {
 }
 
 func (h *Handler) handleQuickBook(msg *tgbotapi.Message) {
-	ctx := context.Background()
-	now := time.Now().In(hkt)
-	slotStart := time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), 0, 0, 0, hkt)
-
-	hasBooking, err := h.service.UserHasBookingForSlot(ctx, msg.From.ID, slotStart)
-	if err == nil && hasBooking {
-		h.sendText(msg.Chat.ID, "✅ You already have a booking for this hour. Use 📋 My Bookings to view it.")
-		return
-	}
-
-	machine, err := h.service.GetFreeMachineForSlot(ctx, slotStart)
-	if err != nil {
-		h.sendText(msg.Chat.ID, "😔 Sorry, no machines are available right now. Try booking a later slot with 📅 Book a Session.")
-		return
-	}
-
-	endTime := slotStart.Add(time.Hour)
-	remaining := int(endTime.Sub(now).Minutes())
-
-	if remaining < 10 {
-		nextSlot := slotStart.Add(time.Hour)
-		nextMachine, nextErr := h.service.GetFreeMachineForSlot(ctx, nextSlot)
-		if nextErr != nil {
-			h.sendText(msg.Chat.ID, fmt.Sprintf("⏱ Only %d min left in this hour and the next slot is full. Try 📅 Book a Session.", remaining))
-			return
-		}
-		machine = nextMachine
-		slotStart = nextSlot
-		endTime = nextSlot.Add(time.Hour)
-		remaining = 60
-	}
-
-	text := fmt.Sprintf("⚡ *Quick Book — Right Now*\n\n"+
-		"  Machine: %s\n"+
-		"  Date:    %s\n"+
-		"  Time:    %s - %s\n"+
-		"  ⏱ %d min remaining in this slot\n\n"+
-		"Confirm?",
-		machine.Name,
-		slotStart.Format("Jan 2, 2006"),
-		slotStart.Format("15:04"),
-		endTime.Format("15:04"),
-		remaining,
-	)
-
-	keyboard := buildConfirmKeyboard(machine.ID, slotStart.Format("2006-01-02T15:04"))
-	reply := tgbotapi.NewMessage(msg.Chat.ID, text)
+	keyboard := buildQuickBookRoomKeyboard()
+	reply := tgbotapi.NewMessage(msg.Chat.ID, "⚡ *Quick Book — Select a room:*")
 	reply.ParseMode = tgbotapi.ModeMarkdown
 	reply.ReplyMarkup = keyboard
 	if _, err := h.bot.Send(reply); err != nil {
-		log.Printf("Error sending quick book: %v", err)
+		log.Printf("Error sending quick book room selection: %v", err)
 	}
 }
 

@@ -17,21 +17,23 @@ func NewStore(pool *pgxpool.Pool) *Store {
 	return &Store{pool: pool}
 }
 
-func (s *Store) CountActiveMachines(ctx context.Context) (int, error) {
+func (s *Store) CountActiveMachines(ctx context.Context, room string) (int, error) {
 	var count int
-	err := s.pool.QueryRow(ctx, "SELECT COUNT(*) FROM machines WHERE is_active = true").Scan(&count)
+	err := s.pool.QueryRow(ctx, "SELECT COUNT(*) FROM machines WHERE is_active = true AND room = $1", room).Scan(&count)
 	return count, err
 }
 
-func (s *Store) GetBookedCountsByHour(ctx context.Context, start, end time.Time) (map[int]int, error) {
+func (s *Store) GetBookedCountsByHour(ctx context.Context, start, end time.Time, room string) (map[int]int, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT EXTRACT(HOUR FROM start_time)::int AS hour, COUNT(*)
-		FROM bookings
-		WHERE status = 'confirmed'
-		  AND start_time >= $1
-		  AND start_time < $2
+		SELECT EXTRACT(HOUR FROM b.start_time)::int AS hour, COUNT(*)
+		FROM bookings b
+		JOIN machines m ON m.id = b.machine_id
+		WHERE b.status = 'confirmed'
+		  AND b.start_time >= $1
+		  AND b.start_time < $2
+		  AND m.room = $3
 		GROUP BY hour
-	`, start, end)
+	`, start, end, room)
 	if err != nil {
 		return nil, err
 	}
@@ -48,19 +50,20 @@ func (s *Store) GetBookedCountsByHour(ctx context.Context, start, end time.Time)
 	return counts, rows.Err()
 }
 
-func (s *Store) GetFreeMachineForSlot(ctx context.Context, startTime time.Time) (*model.Machine, error) {
+func (s *Store) GetFreeMachineForSlot(ctx context.Context, startTime time.Time, room string) (*model.Machine, error) {
 	var m model.Machine
 	err := s.pool.QueryRow(ctx, `
-		SELECT m.id, m.name, m.is_active
+		SELECT m.id, m.name, m.is_active, m.room
 		FROM machines m
 		WHERE m.is_active = true
+		  AND m.room = $2
 		  AND m.id NOT IN (
 		      SELECT machine_id FROM bookings
 		      WHERE status = 'confirmed' AND start_time = $1
 		  )
 		ORDER BY m.id
 		LIMIT 1
-	`, startTime).Scan(&m.ID, &m.Name, &m.IsActive)
+	`, startTime, room).Scan(&m.ID, &m.Name, &m.IsActive, &m.Room)
 	if err != nil {
 		return nil, fmt.Errorf("no free machine available for this slot")
 	}
@@ -210,7 +213,7 @@ func (s *Store) GetAllBookingsForRange(ctx context.Context, start, end time.Time
 }
 
 func (s *Store) GetMachines(ctx context.Context) ([]model.Machine, error) {
-	rows, err := s.pool.Query(ctx, "SELECT id, name, is_active FROM machines ORDER BY id")
+	rows, err := s.pool.Query(ctx, "SELECT id, name, is_active, room FROM machines ORDER BY id")
 	if err != nil {
 		return nil, err
 	}
@@ -219,7 +222,7 @@ func (s *Store) GetMachines(ctx context.Context) ([]model.Machine, error) {
 	var machines []model.Machine
 	for rows.Next() {
 		var m model.Machine
-		if err := rows.Scan(&m.ID, &m.Name, &m.IsActive); err != nil {
+		if err := rows.Scan(&m.ID, &m.Name, &m.IsActive, &m.Room); err != nil {
 			return nil, err
 		}
 		machines = append(machines, m)
@@ -232,8 +235,8 @@ func (s *Store) ToggleMachine(ctx context.Context, machineID int) (*model.Machin
 	err := s.pool.QueryRow(ctx, `
 		UPDATE machines SET is_active = NOT is_active
 		WHERE id = $1
-		RETURNING id, name, is_active
-	`, machineID).Scan(&m.ID, &m.Name, &m.IsActive)
+		RETURNING id, name, is_active, room
+	`, machineID).Scan(&m.ID, &m.Name, &m.IsActive, &m.Room)
 	if err != nil {
 		return nil, fmt.Errorf("machine not found")
 	}

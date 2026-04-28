@@ -42,9 +42,31 @@ func buildDateKeyboard(maxDays int) tgbotapi.InlineKeyboardMarkup {
 	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
 
+func buildRoomKeyboard(dateStr string) tgbotapi.InlineKeyboardMarkup {
+	return tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🌟 VIP Room (2 machines)", fmt.Sprintf("room:vip:%s", dateStr)),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🏥 Common Room (3 machines)", fmt.Sprintf("room:common:%s", dateStr)),
+		),
+	)
+}
+
+func buildQuickBookRoomKeyboard() tgbotapi.InlineKeyboardMarkup {
+	return tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🌟 VIP Room", "quickroom:vip"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🏥 Common Room", "quickroom:common"),
+		),
+	)
+}
+
 const defaultSlotLimit = 5
 
-func buildTimeKeyboard(slots []model.SlotAvailability, showAll bool) tgbotapi.InlineKeyboardMarkup {
+func buildTimeKeyboard(slots []model.SlotAvailability, room string, showAll bool) tgbotapi.InlineKeyboardMarkup {
 	now := nowHKT()
 
 	var currentSlot *model.SlotAvailability
@@ -74,7 +96,7 @@ func buildTimeKeyboard(slots []model.SlotAvailability, showAll bool) tgbotapi.In
 			currentSlot.EndTime.Format("15:04"),
 			currentSlot.FreeCount,
 		)
-		callbackData := fmt.Sprintf("booknow:%s", currentSlot.StartTime.Format("2006-01-02T15:04"))
+		callbackData := fmt.Sprintf("booknow:%s:%s", room, currentSlot.StartTime.Format("2006-01-02T15:04"))
 		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData(label, callbackData),
 		))
@@ -93,7 +115,7 @@ func buildTimeKeyboard(slots []model.SlotAvailability, showAll bool) tgbotapi.In
 			slot.EndTime.Format("15:04"),
 			slot.FreeCount,
 		)
-		callbackData := fmt.Sprintf("time:%s", slot.StartTime.Format("2006-01-02T15:04"))
+		callbackData := fmt.Sprintf("time:%s:%s", room, slot.StartTime.Format("2006-01-02T15:04"))
 		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData(label, callbackData),
 		))
@@ -104,7 +126,7 @@ func buildTimeKeyboard(slots []model.SlotAvailability, showAll bool) tgbotapi.In
 		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData(
 				fmt.Sprintf("📋 Show all %d slots", len(upcoming)),
-				fmt.Sprintf("showmore:%s", dateStr),
+				fmt.Sprintf("showmore:%s:%s", room, dateStr),
 			),
 		))
 	}

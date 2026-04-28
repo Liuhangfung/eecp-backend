@@ -31,8 +31,8 @@ func NewService(store *db.Store, maxAdvanceDays, maxActiveBookings int) *Service
 	}
 }
 
-func (s *Service) GetAvailableSlots(ctx context.Context, date time.Time) ([]model.SlotAvailability, error) {
-	activeMachines, err := s.store.CountActiveMachines(ctx)
+func (s *Service) GetAvailableSlots(ctx context.Context, date time.Time, room string) ([]model.SlotAvailability, error) {
+	activeMachines, err := s.store.CountActiveMachines(ctx, room)
 	if err != nil {
 		return nil, fmt.Errorf("count active machines: %w", err)
 	}
@@ -45,7 +45,7 @@ func (s *Service) GetAvailableSlots(ctx context.Context, date time.Time) ([]mode
 		start = time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), 0, 0, 0, hkt)
 	}
 
-	bookedCounts, err := s.store.GetBookedCountsByHour(ctx, start, end)
+	bookedCounts, err := s.store.GetBookedCountsByHour(ctx, start, end, room)
 	if err != nil {
 		return nil, fmt.Errorf("get booked counts: %w", err)
 	}
@@ -67,8 +67,8 @@ func (s *Service) GetAvailableSlots(ctx context.Context, date time.Time) ([]mode
 	return slots, nil
 }
 
-func (s *Service) GetFreeMachineForSlot(ctx context.Context, startTime time.Time) (*model.Machine, error) {
-	return s.store.GetFreeMachineForSlot(ctx, startTime)
+func (s *Service) GetFreeMachineForSlot(ctx context.Context, startTime time.Time, room string) (*model.Machine, error) {
+	return s.store.GetFreeMachineForSlot(ctx, startTime, room)
 }
 
 func (s *Service) UserHasBookingForSlot(ctx context.Context, userID int64, startTime time.Time) (bool, error) {

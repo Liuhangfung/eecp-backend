@@ -39,6 +39,10 @@ func (h *Handler) handleCallback(cq *tgbotapi.CallbackQuery) {
 		h.handleDisclaimer(fakeMsg)
 	case strings.HasPrefix(data, "date:"):
 		h.onDateSelected(chatID, msgID, data)
+	case strings.HasPrefix(data, "room:"):
+		h.onRoomSelected(chatID, msgID, data)
+	case strings.HasPrefix(data, "quickroom:"):
+		h.onQuickRoomSelected(chatID, msgID, cq.From.ID, cq.From.UserName, data)
 	case strings.HasPrefix(data, "time:"):
 		h.onTimeSelected(chatID, msgID, cq.From.ID, cq.From.UserName, data)
 	case strings.HasPrefix(data, "confirm:"):
@@ -60,33 +64,34 @@ func (h *Handler) handleCallback(cq *tgbotapi.CallbackQuery) {
 	}
 }
 
+func roomLabel(room string) string {
+	if room == "vip" {
+		return "🌟 VIP Room"
+	}
+	return "🏥 Common Room"
+}
+
 func (h *Handler) onDateSelected(chatID int64, msgID int, data string) {
 	dateStr := strings.TrimPrefix(data, "date:")
-	date, err := time.Parse("2006-01-02", dateStr)
+	_, err := time.Parse("2006-01-02", dateStr)
 	if err != nil {
 		h.editMessage(chatID, msgID, "Invalid date selected.", nil)
 		return
 	}
 
-	ctx := context.Background()
-	slots, err := h.service.GetAvailableSlots(ctx, date)
-	if err != nil {
-		h.editMessage(chatID, msgID, "Error loading available slots.", nil)
-		log.Printf("Error getting slots: %v", err)
-		return
-	}
-
-	if len(slots) == 0 {
-		h.editMessage(chatID, msgID, fmt.Sprintf("No available slots for %s.", date.Format("Jan 2, 2006")), nil)
-		return
-	}
-
-	keyboard := buildTimeKeyboard(slots, false)
-	h.editMessage(chatID, msgID, fmt.Sprintf("Available slots for %s:", date.Format("Jan 2, 2006")), &keyboard)
+	keyboard := buildRoomKeyboard(dateStr)
+	h.editMessage(chatID, msgID, "🏠 Select a room:", &keyboard)
 }
 
-func (h *Handler) onShowMoreSlots(chatID int64, msgID int, data string) {
-	dateStr := strings.TrimPrefix(data, "showmore:")
+func (h *Handler) onRoomSelected(chatID int64, msgID int, data string) {
+	// room:<vip|common>:<date>
+	parts := strings.SplitN(strings.TrimPrefix(data, "room:"), ":", 2)
+	if len(parts) != 2 {
+		h.editMessage(chatID, msgID, "Invalid room selection.", nil)
+		return
+	}
+	room, dateStr := parts[0], parts[1]
+
 	date, err := time.Parse("2006-01-02", dateStr)
 	if err != nil {
 		h.editMessage(chatID, msgID, "Invalid date.", nil)
@@ -94,19 +99,107 @@ func (h *Handler) onShowMoreSlots(chatID int64, msgID int, data string) {
 	}
 
 	ctx := context.Background()
-	slots, err := h.service.GetAvailableSlots(ctx, date)
+	slots, err := h.service.GetAvailableSlots(ctx, date, room)
 	if err != nil {
 		h.editMessage(chatID, msgID, "Error loading available slots.", nil)
 		log.Printf("Error getting slots: %v", err)
 		return
 	}
 
-	keyboard := buildTimeKeyboard(slots, true)
-	h.editMessage(chatID, msgID, fmt.Sprintf("All available slots for %s:", date.Format("Jan 2, 2006")), &keyboard)
+	if len(slots) == 0 {
+		h.editMessage(chatID, msgID, fmt.Sprintf("No available slots in %s for %s.", roomLabel(room), date.Format("Jan 2, 2006")), nil)
+		return
+	}
+
+	keyboard := buildTimeKeyboard(slots, room, false)
+	h.editMessage(chatID, msgID, fmt.Sprintf("%s — Available slots for %s:", roomLabel(room), date.Format("Jan 2, 2006")), &keyboard)
+}
+
+func (h *Handler) onQuickRoomSelected(chatID int64, msgID int, userID int64, username string, data string) {
+	room := strings.TrimPrefix(data, "quickroom:")
+
+	now := nowHKT()
+	slotStart := time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), 0, 0, 0, hkt)
+
+	ctx := context.Background()
+
+	hasBooking, err := h.service.UserHasBookingForSlot(ctx, userID, slotStart)
+	if err == nil && hasBooking {
+		h.editMessage(chatID, msgID, "✅ You already have a booking for this hour. Use 📋 My Bookings to view it.", nil)
+		return
+	}
+
+	machine, err := h.service.GetFreeMachineForSlot(ctx, slotStart, room)
+	if err != nil {
+		h.editMessage(chatID, msgID, fmt.Sprintf("😔 No machines available in %s right now. Try 📅 Book a Session.", roomLabel(room)), nil)
+		return
+	}
+
+	endTime := slotStart.Add(time.Hour)
+	remaining := int(endTime.Sub(now).Minutes())
+
+	if remaining < 10 {
+		nextSlot := slotStart.Add(time.Hour)
+		nextMachine, nextErr := h.service.GetFreeMachineForSlot(ctx, nextSlot, room)
+		if nextErr != nil {
+			h.editMessage(chatID, msgID, fmt.Sprintf("⏱ Only %d min left and the next slot in %s is full.", remaining, roomLabel(room)), nil)
+			return
+		}
+		machine = nextMachine
+		slotStart = nextSlot
+		endTime = nextSlot.Add(time.Hour)
+		remaining = 60
+	}
+
+	text := fmt.Sprintf("⚡ Quick Book — %s\n\n  Machine: %s\n  Date:    %s\n  Time:    %s - %s\n  ⏱ %d min remaining\n\nConfirm?",
+		roomLabel(room),
+		machine.Name,
+		slotStart.Format("Jan 2, 2006"),
+		slotStart.Format("15:04"),
+		endTime.Format("15:04"),
+		remaining,
+	)
+
+	keyboard := buildConfirmKeyboard(machine.ID, slotStart.Format("2006-01-02T15:04"))
+	h.editMessage(chatID, msgID, text, &keyboard)
+}
+
+func (h *Handler) onShowMoreSlots(chatID int64, msgID int, data string) {
+	// showmore:<room>:<date>
+	parts := strings.SplitN(strings.TrimPrefix(data, "showmore:"), ":", 2)
+	if len(parts) != 2 {
+		h.editMessage(chatID, msgID, "Invalid data.", nil)
+		return
+	}
+	room, dateStr := parts[0], parts[1]
+
+	date, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		h.editMessage(chatID, msgID, "Invalid date.", nil)
+		return
+	}
+
+	ctx := context.Background()
+	slots, err := h.service.GetAvailableSlots(ctx, date, room)
+	if err != nil {
+		h.editMessage(chatID, msgID, "Error loading available slots.", nil)
+		log.Printf("Error getting slots: %v", err)
+		return
+	}
+
+	keyboard := buildTimeKeyboard(slots, room, true)
+	h.editMessage(chatID, msgID, fmt.Sprintf("%s — All slots for %s:", roomLabel(room), date.Format("Jan 2, 2006")), &keyboard)
 }
 
 func (h *Handler) onBookNow(chatID int64, msgID int, userID int64, username string, data string) {
-	timeStr := strings.TrimPrefix(data, "booknow:")
+	// booknow:<room>:<time>
+	parts := strings.SplitN(strings.TrimPrefix(data, "booknow:"), ":", 2)
+	if len(parts) != 2 {
+		h.editMessage(chatID, msgID, "Invalid data.", nil)
+		return
+	}
+	room, timeStr := parts[0], parts[1]
+
 	startTime, err := time.Parse("2006-01-02T15:04", timeStr)
 	if err != nil {
 		h.editMessage(chatID, msgID, "Invalid time.", nil)
@@ -118,13 +211,14 @@ func (h *Handler) onBookNow(chatID int64, msgID int, userID int64, username stri
 	remaining := endTime.Sub(now)
 
 	ctx := context.Background()
-	machine, err := h.service.GetFreeMachineForSlot(ctx, startTime)
+	machine, err := h.service.GetFreeMachineForSlot(ctx, startTime, room)
 	if err != nil {
-		h.editMessage(chatID, msgID, "Sorry, no machines are available right now.", nil)
+		h.editMessage(chatID, msgID, fmt.Sprintf("Sorry, no machines available in %s right now.", roomLabel(room)), nil)
 		return
 	}
 
-	text := fmt.Sprintf("⚡ Book Now — confirm your booking:\n\n  Machine: %s\n  Date:    %s\n  Time:    %s - %s\n  ⏱ %d min remaining in this slot",
+	text := fmt.Sprintf("⚡ Book Now — %s\n\n  Machine: %s\n  Date:    %s\n  Time:    %s - %s\n  ⏱ %d min remaining",
+		roomLabel(room),
 		machine.Name,
 		startTime.Format("Jan 2, 2006"),
 		startTime.Format("15:04"),
@@ -137,7 +231,14 @@ func (h *Handler) onBookNow(chatID int64, msgID int, userID int64, username stri
 }
 
 func (h *Handler) onTimeSelected(chatID int64, msgID int, userID int64, username string, data string) {
-	timeStr := strings.TrimPrefix(data, "time:")
+	// time:<room>:<time>
+	parts := strings.SplitN(strings.TrimPrefix(data, "time:"), ":", 2)
+	if len(parts) != 2 {
+		h.editMessage(chatID, msgID, "Invalid data.", nil)
+		return
+	}
+	room, timeStr := parts[0], parts[1]
+
 	startTime, err := time.Parse("2006-01-02T15:04", timeStr)
 	if err != nil {
 		h.editMessage(chatID, msgID, "Invalid time selected.", nil)
@@ -145,13 +246,14 @@ func (h *Handler) onTimeSelected(chatID int64, msgID int, userID int64, username
 	}
 
 	ctx := context.Background()
-	machine, err := h.service.GetFreeMachineForSlot(ctx, startTime)
+	machine, err := h.service.GetFreeMachineForSlot(ctx, startTime, room)
 	if err != nil {
 		h.editMessage(chatID, msgID, "Sorry, this slot is no longer available.", nil)
 		return
 	}
 
-	text := fmt.Sprintf("Confirm your booking:\n\n  Machine: %s\n  Date:    %s\n  Time:    %s - %s",
+	text := fmt.Sprintf("Confirm your booking — %s\n\n  Machine: %s\n  Date:    %s\n  Time:    %s - %s",
+		roomLabel(room),
 		machine.Name,
 		startTime.Format("Jan 2, 2006"),
 		startTime.Format("15:04"),
