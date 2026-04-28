@@ -1,0 +1,34 @@
+version: "3.9"
+
+services:
+  eecp-postgres:
+    image: postgres:16-alpine
+    container_name: eecp-postgres
+    environment:
+      POSTGRES_USER: eecp
+      POSTGRES_PASSWORD: eecp_pass
+      POSTGRES_DB: eecp_booking
+    ports:
+      - "5433:5432"
+    volumes:
+      - eecp-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eecp -d eecp_booking"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  eecp-bot:
+    build: .
+    container_name: eecp-bot
+    depends_on:
+      eecp-postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://eecp:eecp_pass@eecp-postgres:5432/eecp_booking?sslmode=disable
+    restart: unless-stopped
+
+volumes:
+  eecp-pgdata:
