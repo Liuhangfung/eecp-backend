@@ -140,6 +140,13 @@ func (h *Handler) onQuickRoomSelected(chatID int64, msgID int, userID int64, use
 
 	if remaining < 10 {
 		nextSlot := slotStart.Add(time.Hour)
+
+		hasNext, _ := h.service.UserHasBookingForSlot(ctx, userID, nextSlot)
+		if hasNext {
+			h.editMessage(chatID, msgID, "✅ You already have a booking for the next hour. Use 📋 My Bookings to view it.", nil)
+			return
+		}
+
 		nextMachine, nextErr := h.service.GetFreeMachineForSlot(ctx, nextSlot, room)
 		if nextErr != nil {
 			h.editMessage(chatID, msgID, fmt.Sprintf("⏱ Only %d min left and the next slot in %s is full.", remaining, roomLabel(room)), nil)
@@ -288,6 +295,13 @@ func (h *Handler) onConfirm(chatID int64, msgID int, userID int64, username stri
 	}
 
 	ctx := context.Background()
+
+	hasBooking, _ := h.service.UserHasBookingForSlot(ctx, userID, startTime)
+	if hasBooking {
+		h.editMessage(chatID, msgID, "✅ You already have a booking for this time slot. Use 📋 My Bookings to view it.", nil)
+		return
+	}
+
 	b, err := h.service.CreateBooking(ctx, machineID, userID, username, startTime)
 	if err != nil {
 		h.editMessage(chatID, msgID, fmt.Sprintf("Booking failed: %v", err), nil)
